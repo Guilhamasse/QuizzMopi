@@ -1,13 +1,12 @@
 import React from "react";
 
-export default function ScoreboardPage({ leaderboard, username }) {
+export default function ScoreboardPage({ leaderboard, username, resetCountdown }) {
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
 
   const myRank = leaderboard.findIndex((p) => p.username === username) + 1;
   const myScore = leaderboard.find((p) => p.username === username)?.score || 0;
 
-  // Réorganiser pour affichage podium : 2nd | 1st | 3rd
   const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
 
   return (
@@ -33,9 +32,9 @@ export default function ScoreboardPage({ leaderboard, username }) {
       </div>
 
       {/* Podium */}
-      {top3.length >= 2 && (
+      {top3.length >= 1 && (
         <div className="podium">
-          {podiumOrder.map((p, visualIdx) => {
+          {podiumOrder.map((p) => {
             const realRank = leaderboard.findIndex((x) => x.username === p.username) + 1;
             return (
               <div className="podium-item" key={p.username}>
@@ -62,7 +61,7 @@ export default function ScoreboardPage({ leaderboard, username }) {
           {rest.map((p, i) => (
             <div
               key={p.username}
-              className={`final-item ${p.username === username ? "is-me" : ""}`}
+              className="final-item"
               style={p.username === username ? { borderColor: "rgba(124,58,237,0.4)" } : {}}
             >
               <span className="final-rank">#{i + 4}</span>
@@ -73,9 +72,13 @@ export default function ScoreboardPage({ leaderboard, username }) {
         </div>
       )}
 
-      <p className="text-small" style={{ marginTop: 8 }}>
-        Nouvelle partie dans quelques instants…
-      </p>
+      {/* Countdown reset */}
+      {resetCountdown !== null && resetCountdown > 0 && (
+        <p className="text-small" style={{ marginTop: 8 }}>
+          Nouvelle partie dans{" "}
+          <strong style={{ color: "var(--neon)" }}>{resetCountdown}s</strong>…
+        </p>
+      )}
     </div>
   );
 }

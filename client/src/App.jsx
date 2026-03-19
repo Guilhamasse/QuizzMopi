@@ -27,6 +27,9 @@ export default function App() {
   const [answerResult, setAnswerResult] = useState(null);
   const [events, setEvents] = useState([]);
   const [myScore, setMyScore] = useState(0);
+  const [waitingInfo, setWaitingInfo] = useState(null);   // { current, needed }
+  const [countdown, setCountdown] = useState(null);       // countdown avant quiz
+  const [resetCountdown, setResetCountdown] = useState(null); // countdown avant reset
 
   const { toasts, addToast } = useToasts();
 
@@ -64,9 +67,19 @@ export default function App() {
       addEvent(`👋 ${u} a quitté la partie`);
     });
 
+    socket.on("waitingForPlayers", ({ current, needed }) => {
+      setPlayers(prev => prev); // déclenche un re-render
+      setWaitingInfo({ current, needed });
+    });
+
+    socket.on("quizCountdown", ({ secondsLeft }) => {
+      setCountdown(secondsLeft);
+    });
+
     socket.on("quizStart", ({ message }) => {
       addToast("🚀 " + message);
       addEvent("🚀 " + message);
+      setCountdown(null);
       setScreen(SCREEN.QUIZ);
       setSelectedAnswer(null);
       setCorrectAnswer(null);
@@ -108,7 +121,12 @@ export default function App() {
       setLeaderboard(lb);
       setCurrentQuestion(null);
       setScreen(SCREEN.SCOREBOARD);
+      setResetCountdown(15);
       addToast("🏁 Quiz terminé !");
+    });
+
+    socket.on("resetCountdown", ({ secondsLeft }) => {
+      setResetCountdown(secondsLeft);
     });
 
     socket.on("gameReset", ({ message }) => {
@@ -118,6 +136,9 @@ export default function App() {
       setAnswerResult(null);
       setCurrentQuestion(null);
       setMyScore(0);
+      setResetCountdown(null);
+      setCountdown(null);
+      setWaitingInfo(null);
       addToast("🔄 " + message);
       addEvent("🔄 " + message);
     });
@@ -129,6 +150,8 @@ export default function App() {
       socket.off("joinedGame");
       socket.off("playerJoined");
       socket.off("playerLeft");
+      socket.off("waitingForPlayers");
+      socket.off("quizCountdown");
       socket.off("quizStart");
       socket.off("newQuestion");
       socket.off("timerUpdate");
@@ -136,6 +159,7 @@ export default function App() {
       socket.off("answerResult");
       socket.off("revealAnswer");
       socket.off("quizEnd");
+      socket.off("resetCountdown");
       socket.off("gameReset");
       socket.disconnect();
     };
@@ -174,7 +198,7 @@ export default function App() {
         {/* ── Panel principal ───────────────────────────────────── */}
         <div className="main-panel">
           {screen === SCREEN.WAITING && (
-            <WaitingPage username={username} players={players} />
+            <WaitingPage username={username} players={players} waitingInfo={waitingInfo} countdown={countdown} />
           )}
 
           {screen === SCREEN.QUIZ && (
@@ -189,7 +213,7 @@ export default function App() {
           )}
 
           {screen === SCREEN.SCOREBOARD && (
-            <ScoreboardPage leaderboard={leaderboard} username={username} />
+            <ScoreboardPage leaderboard={leaderboard} username={username} resetCountdown={resetCountdown} />
           )}
         </div>
 

@@ -23,7 +23,8 @@ let quizStarted = false;
 let timerInterval = null;
 let timeLeft = 0;
 const QUESTION_DURATION = 15;
-const MIN_PLAYERS = 1;
+const MIN_PLAYERS = 2;        // ← au moins 2 joueurs pour démarrer
+const SCOREBOARD_DURATION = 15000; // 15s sur le scoreboard avant reset
 
 // ─── REST API ──────────────────────────────────────────────────────────────────
 app.get("/questions", (req, res) => {
@@ -113,10 +114,19 @@ function endQuiz() {
   clearInterval(timerInterval);
   io.emit("quizEnd", { leaderboard: getLeaderboard() });
 
-  // Reset pour une nouvelle partie dans 10 secondes
+  // Countdown visible côté client avant reset
+  let countdown = 15;
+  const countInterval = setInterval(() => {
+    countdown -= 1;
+    io.emit("resetCountdown", { secondsLeft: countdown });
+    if (countdown <= 0) clearInterval(countInterval);
+  }, 1000);
+
+  // Reset après 15 secondes (assez de temps pour voir le scoreboard)
   setTimeout(() => {
+    clearInterval(countInterval);
     resetQuiz();
-  }, 10000);
+  }, 15000);
 }
 
 function resetQuiz() {
@@ -136,8 +146,25 @@ function tryStartQuiz() {
   if (!quizStarted && playerCount >= MIN_PLAYERS) {
     quizStarted = true;
     currentQuestionIndex = 0;
-    io.emit("quizStart", { message: "Le quiz commence !" });
-    setTimeout(() => sendQuestion(), 2000);
+    // Countdown de 5s avant le début
+    let countdown = 5;
+    io.emit("quizCountdown", { secondsLeft: countdown });
+    const interval = setInterval(() => {
+      countdown -= 1;
+      if (countdown > 0) {
+        io.emit("quizCountdown", { secondsLeft: countdown });
+      } else {
+        clearInterval(interval);
+        io.emit("quizStart", { message: "C'est parti !" });
+        sendQuestion();
+      }
+    }, 1000);
+  } else if (!quizStarted) {
+    // Informer combien de joueurs manquent
+    io.emit("waitingForPlayers", {
+      current: playerCount,
+      needed: MIN_PLAYERS,
+    });
   }
 }
 
@@ -179,6 +206,14 @@ io.on("connection", (socket) => {
 
     broadcastPlayers();
     io.emit("playerJoined", { username: trimmed });
+
+    // Toujours informer du nb de joueurs en attente avant d'essayer de démarrer
+    if (!quizStarted) {
+      io.emit("waitingForPlayers", {
+        current: Object.keys(players).length,
+        needed: MIN_PLAYERS,
+      });
+    }
 
     tryStartQuiz();
   });
